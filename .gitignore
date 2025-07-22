@@ -13,3 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+<<<<<<< HEAD
+=======
+# Log/OS Files
+*.log
+>>>>>>> f733d9a7b24365059bce9c7993f56ec40e420b89
