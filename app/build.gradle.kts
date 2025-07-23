@@ -98,5 +98,7 @@ dependencies {
     // Paging para Compose
     implementation("androidx.paging:paging-compose:3.3.0")
 
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
 
 }
