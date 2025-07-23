@@ -10,7 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -32,28 +34,57 @@ fun EncounterDetailsScreen(
         }
     )
 
-    val encounters by viewModel.state.collectAsState()
+    // Recolectamos ambos estados desde el ViewModel
+    val filteredEncounters by viewModel.state.collectAsState()
+    val distanceFilterValue by viewModel.distanceFilter.collectAsState()
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(8.dp)
-    ) {
-        items(encounters) { encounter ->
-            EncounterItem(
-                encounter = encounter,
-                onClick = { onNavigateToDetails(encounter.pidB) }
+    // Usamos un Column para poner el Slider encima de la lista
+    Column(modifier = Modifier.fillMaxSize()) {
+        //  UI DEL FILTRO
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Filtrar hasta:", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "${String.format("%.1f", distanceFilterValue)} metros",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Slider(
+                value = distanceFilterValue,
+                onValueChange = { viewModel.updateDistanceFilter(it) },
+                valueRange = 0f..5f,
+                // Pasos para permitir decimales (50 pasos en un rango de 5 = pasos de 0.1)
+                steps = 49
             )
+        }
+
+
+        Divider() // Un separador visual
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(8.dp)
+        ) {
+            items(filteredEncounters) { encounter ->
+                EncounterItem(
+                    encounter = encounter,
+                    onClick = { onNavigateToDetails(encounter.pidB) }
+                )
+            }
         }
     }
 }
 
-// EncounterItem actualizado para mostrar PIDs completos y distancia
 @Composable
 private fun EncounterItem(encounter: Encounter, onClick: () -> Unit) {
     val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         .format(Date(encounter.timestamp))
 
-    // 1. Calculamos la distancia usando la función del modelo
     val distance = encounter.getDistanceEstimate()
 
     Card(
@@ -64,12 +95,10 @@ private fun EncounterItem(encounter: Encounter, onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(Modifier.padding(12.dp)) {
-            // 2. Mostramos los PIDs completos, sin el .take(8)
             Text(text = "Desde (A): ${encounter.pidA}", style = MaterialTheme.typography.bodyLarge)
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = "Con (B): ${encounter.pidB}", style = MaterialTheme.typography.bodyLarge)
             Spacer(modifier = Modifier.height(4.dp))
-            // 3. Mostramos el RSSI y la distancia formateada a un decimal
             Text(
                 text = "RSSI: ${encounter.rssi} dBm (≈ ${String.format("%.1f", distance)}m)",
                 style = MaterialTheme.typography.bodyMedium
