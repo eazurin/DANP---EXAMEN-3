@@ -103,12 +103,12 @@ class MainActivity : ComponentActivity() {
 
                 Button(
                     onClick = {
-                        val intent = Intent(context, AdminActivity::class.java)
+                        val intent = Intent(context, LoginActivity::class.java)
                         context.startActivity(intent)
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Abrir Dashboard (demo)")
+                    Text("Loguearse")
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))

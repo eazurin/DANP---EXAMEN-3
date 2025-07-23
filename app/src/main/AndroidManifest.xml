@@ -49,6 +49,10 @@
         <activity
             android:name=".ui.admin.AdminActivity"
             android:exported="false" />
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Examen3" />
     </application>
 
 </manifest>
