@@ -7,11 +7,26 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
 import android.util.Log
+import androidx.room.Room
+import com.example.examen3.data.EncounterRepository
+import com.example.examen3.data.local.AppDatabase
+import com.example.examen3.util.PidStore
+import com.example.examen3.work.SyncWorker
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class ProximityService {
+    private lateinit var appContext: Context
+    private lateinit var repository: EncounterRepository
+    private val coroutineScope = CoroutineScope(Dispatchers.IO)
+    private val lastSaved   = mutableMapOf<String, Long>()
+    private val MIN_WINDOW_MS = 10 * 1_000
+
 
     companion object {
         private const val TAG = "ProximityService"
@@ -21,6 +36,7 @@ class ProximityService {
         private const val SCAN_INTERVAL_MS = 30000L // Escanear cada 30 segundos
         private const val ADVERTISE_INTERVAL_MS = 100 // 100ms para advertising
         private const val TX_POWER_LEVEL = AdvertiseSettings.ADVERTISE_TX_POWER_LOW
+
     }
 
     private var bluetoothLeAdvertiser: BluetoothLeAdvertiser? = null
@@ -72,19 +88,22 @@ class ProximityService {
     }
 
     fun startService(context: Context, bluetoothAdapter: BluetoothAdapter) {
-        if (!bluetoothAdapter.isMultipleAdvertisementSupported) {
-            Log.e(TAG, "Advertising no soportado en este dispositivo")
-            return
-        }
+        appContext = context.applicationContext
 
         bluetoothLeAdvertiser = bluetoothAdapter.bluetoothLeAdvertiser
-        bluetoothLeScanner = bluetoothAdapter.bluetoothLeScanner
+        bluetoothLeScanner    = bluetoothAdapter.bluetoothLeScanner
 
-        if (bluetoothLeAdvertiser == null || bluetoothLeScanner == null) {
-            Log.e(TAG, "BluetoothLE advertiser o scanner no disponible")
-            return
-        }
+        // inicializamos aquí Room, Firestore y el EncounterRepository
+        val db = Room.databaseBuilder(
+            appContext,
+            AppDatabase::class.java, "encounters.db"
+        ).build()
+        val dao = db.encounterDao()
+        val firestore = FirebaseFirestore.getInstance()
+        val myPid = PidStore.getMyPid(appContext)
+        repository = EncounterRepository(dao, firestore, myPid)
 
+        // el resto de tu arranque de advertising/scanning…
         startAdvertising()
         startPeriodicScanning()
     }
@@ -172,13 +191,26 @@ class ProximityService {
 
         // 3️⃣ Construir y postear el evento
         val proximityEvent = ProximityEvent(
-            deviceId   = deviceId,
-            rssi       = rssi,
-            timestamp  = System.currentTimeMillis(),
-            duration   = calculateEncounterDuration(deviceId)
+            deviceId  = deviceId,
+            rssi      = rssi,
+            timestamp = System.currentTimeMillis(),
+            duration  = calculateEncounterDuration(deviceId)
         )
-        Log.d(TAG, "Evento de proximidad agregado: $proximityEvent")
+
+        val now   = System.currentTimeMillis()
+        val last  = lastSaved[deviceId] ?: 0L
+        if (now - last >= MIN_WINDOW_MS) {
+            lastSaved[deviceId] = now
+            coroutineScope.launch {
+                repository.saveLocal(deviceId, rssi)
+            }
+        } else {
+            Log.d(TAG, "⏩  Ignorado por ventana mínima ($MIN_WINDOW_MS ms)")
+        }
+
         ProximityEventBus.postEvent(proximityEvent)
+        SyncWorker.enqueue(appContext)
+
     }
 
 
@@ -207,6 +239,8 @@ class ProximityService {
         return 60000L // 1 minuto por defecto
     }
 
+
+
     fun stopService() {
         // Detener advertising
         if (isAdvertising) {
@@ -230,4 +264,5 @@ class ProximityService {
     fun clearProximityEvents() {
         proximityEventsQueue.clear()
     }
+
 }

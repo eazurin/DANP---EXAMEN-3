@@ -15,9 +15,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.examen3.ui.admin.AdminActivity
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 
 class MainActivity : ComponentActivity() {
 
@@ -44,6 +48,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Firebase.auth.signInAnonymously()
 
         proximityService = ProximityService()
 
@@ -60,6 +65,7 @@ class MainActivity : ComponentActivity() {
     private fun ProximityApp(viewModel: ProximityViewModel = viewModel()) {
         // Arranca en 0 y se actualiza sólo cuando haya un *nuevo* dispositivo
         val uniqueCount by viewModel.uniqueDeviceCount.collectAsState(initial = 0)
+        val context = LocalContext.current
 
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -93,6 +99,16 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Detener Rastreo")
+                }
+
+                Button(
+                    onClick = {
+                        val intent = Intent(context, AdminActivity::class.java)
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Abrir Dashboard (demo)")
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
