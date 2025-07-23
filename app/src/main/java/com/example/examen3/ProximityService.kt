@@ -108,6 +108,14 @@ class ProximityService {
         startPeriodicScanning()
     }
 
+    private fun pidToBytes(pid: String): ByteArray {
+        val uuid = UUID.fromString(pid)
+        val buffer = ByteBuffer.allocate(16)
+        buffer.putLong(uuid.mostSignificantBits)
+        buffer.putLong(uuid.leastSignificantBits)
+        return buffer.array()           // ¡sólo 16 bytes!
+    }
+
     private fun startAdvertising() {
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
@@ -116,15 +124,19 @@ class ProximityService {
             .setTimeout(0)
             .build()
 
+        // 1) Convertimos el PID (String) → 16 bytes binarios
+        val pidBytes = pidToBytes(PidStore.getMyPid(appContext))
+
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
             .addServiceUuid(ParcelUuid.fromString(SERVICE_UUID))
-            .addServiceData(ParcelUuid.fromString(SERVICE_UUID), generateDeviceId())
+            .addServiceData(ParcelUuid.fromString(SERVICE_UUID), pidBytes)
             .build()
 
         bluetoothLeAdvertiser?.startAdvertising(settings, data, advertiseCallback)
     }
+
 
     private fun startPeriodicScanning() {
         scanRunnable = object : Runnable {
@@ -185,8 +197,13 @@ class ProximityService {
             return
         }
 
-        // 2️⃣ Usar la MAC como ID (sin los ':')
-        val deviceId = address.replace(":", "")
+        val record = result.scanRecord ?: run {
+            Log.d(TAG, "No hay scanRecord, ignorando paquete")
+            return
+        }
+
+        val raw = record.getServiceData(ParcelUuid.fromString(SERVICE_UUID)) ?: return
+        val deviceId = bytesToUuidString(raw)
         Log.d(TAG, "✔ Registrando evento con ID de MAC: $deviceId")
 
         // 3️⃣ Construir y postear el evento
@@ -263,6 +280,13 @@ class ProximityService {
 
     fun clearProximityEvents() {
         proximityEventsQueue.clear()
+    }
+
+    private fun bytesToUuidString(raw: ByteArray): String {
+        val bb = ByteBuffer.wrap(raw)
+        val msb = bb.long
+        val lsb = bb.long
+        return UUID(msb, lsb).toString()   // devuelve "cf8885f3-5d79-4db6-b88d-2f6876aaf2aa"
     }
 
 }
