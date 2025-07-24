@@ -10,27 +10,22 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
+import kotlin.math.*
 
 @Composable
 fun GraphScreen(positivePid: String) {
 
-    // ViewModel con initializer → sin Factory explícito
     val vm: GraphViewModel = viewModel(
         key = positivePid,
-        initializer = { GraphViewModel(positivePid) }
+        initializer = { GraphViewModel(positivePid) }   // sin Factory manual
     )
-
     val state by vm.state.collectAsState()
 
     Box(Modifier.fillMaxSize()) {
-        if (state.nodes.isEmpty()) {
+        if (state.nodes.isEmpty())
             CircularProgressIndicator(Modifier.align(Alignment.Center))
-        } else {
+        else
             ContagionGraph(state)
-        }
     }
 }
 
@@ -48,16 +43,17 @@ private fun ContagionGraph(state: GraphState) {
         val cx = size.width / 2
         val cy = size.height / 2
 
-        fun pos(i: Int): Offset {
-            if (i == 0) return Offset(cx, cy)           // positivo al centro
-            val ang = 2 * PI * (i - 1) / n - PI / 2
-            return Offset(
-                cx + radius.toPx() * cos(ang).toFloat(),
-                cy + radius.toPx() * sin(ang).toFloat()
-            )
-        }
+        fun pos(i: Int): Offset =
+            if (i == 0) Offset(cx, cy)
+            else {
+                val ang = 2 * PI * (i - 1) / n - PI / 2
+                Offset(
+                    cx + radius.toPx() * cos(ang).toFloat(),
+                    cy + radius.toPx() * sin(ang).toFloat()
+                )
+            }
 
-        // Aristas
+        /* Aristas */
         state.edges.forEach { e ->
             val from = state.nodes.indexOfFirst { it.pid == e.from }
             val to   = state.nodes.indexOfFirst { it.pid == e.to }
@@ -73,7 +69,7 @@ private fun ContagionGraph(state: GraphState) {
             )
         }
 
-        // Nodos
+        /* Nodos */
         state.nodes.forEachIndexed { idx, node ->
             drawCircle(
                 color = when (node.type) {

@@ -92,6 +92,10 @@ fun AdminNavigation() {
                 HostListScreen(
                     onHostClick = { pidA ->
                         navController.navigate("encounter_details/$pidA")
+                    },
+
+                    onGraphClick = { pid ->                      // ←  NUEVO
+                        navController.navigate("graph/$pid")
                     }
                 )
             }
@@ -107,6 +111,14 @@ fun AdminNavigation() {
                         navController.navigate("encounter_details/$nextPid")
                     }
                 )
+            }
+
+            /* ───── NUEVA RUTA PARA EL GRAFO ───── */
+            composable(
+                route = "graph/{pid}",
+                arguments = listOf(navArgument("pid") { type = NavType.StringType })
+            ) { back ->
+                GraphScreen(back.arguments?.getString("pid") ?: "")
             }
         }
     }

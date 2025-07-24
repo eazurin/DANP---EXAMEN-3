@@ -37,7 +37,7 @@ class GraphBuilder(private val dao: EncounterDao) {
             val level = RiskScorer.riskLevel(score)
 
             nodes += GraphNode(peer, level)
-            edges += GraphEdge(positivePid, peer, level)
+            edges += GraphEdge(positivePid, peer, level,distance)
         }
         nodes to edges
     }

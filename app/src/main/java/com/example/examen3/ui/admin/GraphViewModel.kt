@@ -7,54 +7,52 @@ import com.example.examen3.data.model.GraphEdge
 import com.example.examen3.data.model.GraphNode
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import kotlin.math.pow
+import com.google.firebase.firestore.ktx.snapshots   // 🔸 añádelo
+
+
 
 class GraphViewModel(private val positivePid: String) : ViewModel() {
 
     private val firestore = FirebaseFirestore.getInstance()
 
     private val _state = MutableStateFlow(GraphState())
-    val state: StateFlow<GraphState> = _state.asStateFlow()
+    val state: StateFlow<GraphState> = _state
 
     init {
         viewModelScope.launch {
             encountersFlow()
-                .map { buildGraph(it) }
+                .map(::buildGraph)
                 .collect { _state.value = it }
         }
     }
-    private fun encountersFlow(): Flow<List<EncounterDoc>> = flowOf(emptyList())
 
-    /*
-    /**  */
-    private fun encountersFlow(): Flow<List<EncounterDoc>> = callbackFlow {
-        val since = Timestamp((System.currentTimeMillis() -
-                TimeUnit.DAYS.toMillis(14)) / 1000, 0)
+    /** Usa snapshots() → Flow<QuerySnapshot> (sin callbackFlow) */
+    private fun encountersFlow(): Flow<List<EncounterDoc>> {
+        val since = Timestamp(
+            (System.currentTimeMillis() - TimeUnit.DAYS.toMillis(14)) / 1000,
+            0
+        )
 
-        val a = firestore.collection("encounters")
+        val flowA = firestore.collection("encounters")
             .whereEqualTo("pid_a", positivePid)
             .whereGreaterThan("timestamp", since)
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                trySend(snap?.documents?.mapNotNull(::mapDoc) ?: emptyList()).isSuccess
-            }
+            .snapshots()                                // ← requiere coroutines‑play‑services
+            .map { qs -> qs.documents.mapNotNull(::mapDoc) }
 
-        val b = firestore.collection("encounters")
+        val flowB = firestore.collection("encounters")
             .whereEqualTo("pid_b", positivePid)
             .whereGreaterThan("timestamp", since)
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                trySend(snap?.documents?.mapNotNull(::mapDoc) ?: emptyList()).isSuccess
-            }
+            .snapshots()
+            .map { qs -> qs.documents.mapNotNull(::mapDoc) }
 
-        awaitClose { a.remove(); b.remove() }
-    }.conflate()
-*/
-    private fun mapDoc(d: com.google.firebase.firestore.DocumentSnapshot): EncounterDoc? =
+        return merge(flowA, flowB).conflate()
+    }
+
+    private fun mapDoc(d: com.google.firebase.firestore.DocumentSnapshot) =
         d.getLong("rssi")?.toInt()?.let { rssi ->
             EncounterDoc(
                 pidA = d.getString("pid_a") ?: return null,
@@ -74,7 +72,7 @@ class GraphViewModel(private val positivePid: String) : ViewModel() {
         val edges = mutableListOf<GraphEdge>()
 
         grouped.forEach { (peer, encs) ->
-            val totalSec = encs.size * 60             // ≈1 min/doc
+            val totalSec = encs.size * 60
             val avgRssi  = encs.map { it.rssi }.average()
             val distance = 10.0.pow((-59 - avgRssi) / 20)
             val daysAgo  = (System.currentTimeMillis() -
@@ -85,7 +83,8 @@ class GraphViewModel(private val positivePid: String) : ViewModel() {
             val level = RiskScorer.riskLevel(score)
 
             nodes += GraphNode(peer, level)
-            edges += GraphEdge(positivePid, peer, level)
+            edges += GraphEdge(positivePid, peer, level,
+                distance  = distance)
         }
         return GraphState(nodes, edges)
     }
