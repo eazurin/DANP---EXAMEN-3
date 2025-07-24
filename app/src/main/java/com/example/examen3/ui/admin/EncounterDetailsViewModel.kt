@@ -5,6 +5,7 @@ package com.example.examen3.ui.admin
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.examen3.data.PositiveRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
@@ -76,5 +77,12 @@ class EncounterDetailsViewModel(private val pidA: String) : ViewModel() {
 
     fun updateDistanceFilter(newDistance: Float) {
         _distanceFilter.value = newDistance
+    }
+    /** Marca el PID como positivo en la colección "positives". */
+    fun markAsPositive(pid: String) {
+        viewModelScope.launch {
+            PositiveRepository(FirebaseFirestore.getInstance())
+                .markPositive(pid)
+        }
     }
 }

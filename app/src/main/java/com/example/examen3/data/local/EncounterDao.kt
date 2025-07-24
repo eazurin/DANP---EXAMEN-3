@@ -19,5 +19,7 @@ interface EncounterDao {
 
     @Query("DELETE FROM encounters_local WHERE synced = 1 AND timestamp < :limit")
     suspend fun purgeOld(limit: Long)
-
+    /** Encuentros de un PID en los últimos días (para el grafo). */
+    @Query("SELECT * FROM encounters_local WHERE pidPeer = :pidPeer AND timestamp >= :since")
+    suspend fun recentForPid(pidPeer: String, since: Long): List<EncounterEntity>
 }
